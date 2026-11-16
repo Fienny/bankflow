@@ -1,0 +1,8 @@
+CREATE TEMP TABLE staging_transfers (
+    row_num BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    from_account_id BIGINT NOT NULL,
+    to_account_id BIGINT NOT NULL,
+    amount NUMERIC(18, 2) NOT NULL,
+    currency CHAR(3) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+) ON COMMIT DROP;
