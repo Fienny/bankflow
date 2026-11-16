@@ -88,36 +88,73 @@ def main():
         ledger_inserted = insert_ledger_entries(conn, batch_id)
         print(f"Ledger entries inserted: {ledger_inserted}")
         assert ledger_inserted == 10
+        ledger_inserted_again = insert_ledger_entries(conn, batch_id)
+
+        print(f"Ledger retry inserted: {ledger_inserted_again}")
+
+        assert ledger_inserted_again == 0
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
                     t.transfer_id,
+                    t.from_account_id,
+                    t.to_account_id,
+                    t.amount AS transfer_amount,
+
                     COUNT(le.entry_id) AS entry_count,
+
                     SUM(le.amount) FILTER (
                         WHERE le.entry_type = 'DEBIT'
                     ) AS total_debit,
+
                     SUM(le.amount) FILTER (
                         WHERE le.entry_type = 'CREDIT'
-                    ) AS total_credit
+                    ) AS total_credit,
+
+                    MAX(le.account_id) FILTER (
+                        WHERE le.entry_type = 'DEBIT'
+                    ) AS debit_account_id,
+
+                    MAX(le.account_id) FILTER (
+                        WHERE le.entry_type = 'CREDIT'
+                    ) AS credit_account_id
+
                 FROM transfers t
                 LEFT JOIN ledger_entries le
                     ON t.transfer_id = le.transfer_id
+
                 WHERE t.source_batch_id = %s
-                GROUP BY t.transfer_id
-                ORDER BY t.transfer_id;
+
+                GROUP BY
+                    t.transfer_id
+
+                ORDER BY
+                    t.transfer_id;
             """, (batch_id,))
 
             ledger_rows = cur.fetchall()
 
         assert len(ledger_rows) == 5
 
-        for transfer_id, entry_count, total_debit, total_credit in ledger_rows:
-            assert entry_count == 2, f"Transfer {transfer_id}: {entry_count} entries"
-            assert total_debit is not None
-            assert total_credit is not None
-            assert total_debit == total_credit, (
-                f"Transfer {transfer_id} is unbalanced!"
-            )
+        for (
+            transfer_id,
+            from_account_id,
+            to_account_id,
+            transfer_amount,
+            entry_count,
+            total_debit,
+            total_credit,
+            debit_account_id,
+            credit_account_id
+        ) in ledger_rows:
+
+            assert entry_count == 2
+
+            assert total_debit == transfer_amount
+            assert total_credit == transfer_amount
+
+            assert debit_account_id == from_account_id
+            assert credit_account_id == to_account_id
 
         print(f"Balanced transfers: {len(ledger_rows)} / 5")
 

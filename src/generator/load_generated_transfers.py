@@ -56,24 +56,28 @@ def insert_ledger_entries(conn, batch_id) -> int:
                 amount,
                 entry_type
             )
-
-            select
+            SELECT
                 transfer_id,
                 from_account_id,
                 amount,
                 'DEBIT'
-            from transfers
+            FROM transfers
             WHERE source_batch_id = %s
-                AND status = 'COMPLETED'
-            union all
-            select
+              AND status = 'COMPLETED'
+
+            UNION ALL
+
+            SELECT
                 transfer_id,
                 to_account_id,
                 amount,
                 'CREDIT'
-            from transfers
+            FROM transfers
             WHERE source_batch_id = %s
-                AND status = 'COMPLETED'
+              AND status = 'COMPLETED'
+
+            ON CONFLICT (transfer_id, entry_type)
+            DO NOTHING
         """, (batch_id, batch_id))
 
         return cur.rowcount
