@@ -46,3 +46,34 @@ def insert_staged_transfers(conn, batch_id) -> int:
         """, (batch_id,))
 
         return cur.rowcount
+
+def insert_ledger_entries(conn, batch_id) -> int:
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO ledger_entries (
+                transfer_id,
+                account_id,
+                amount,
+                entry_type
+            )
+
+            select
+                transfer_id,
+                from_account_id,
+                amount,
+                'DEBIT'
+            from transfers
+            WHERE source_batch_id = %s
+                AND status = 'COMPLETED'
+            union all
+            select
+                transfer_id,
+                to_account_id,
+                amount,
+                'CREDIT'
+            from transfers
+            WHERE source_batch_id = %s
+                AND status = 'COMPLETED'
+        """, (batch_id, batch_id))
+
+        return cur.rowcount
